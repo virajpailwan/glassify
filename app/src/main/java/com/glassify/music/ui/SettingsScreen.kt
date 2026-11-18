@@ -66,6 +66,19 @@ fun SettingsScreen(
                         OptionChip(name, abs(settings.amount - value) < 0.04f, { settings.setAmount(value) })
                     }
                 }
+                Spacer(Modifier.height(16.dp))
+                Text("Quality", color = Color.White, fontSize = 15.sp)
+                Text(
+                    "Smooth is fastest. Max is sharpest but can lag on older phones.",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Smooth", "Balanced", "Max").forEachIndexed { index, name ->
+                        OptionChip(name, settings.quality == index, { settings.setQuality(index) })
+                    }
+                }
             }
         }
 
@@ -131,7 +144,7 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsCard(title: String, content: @Composable () -> Unit) {
-    GlassBox(
+    FlatBox(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         cornerRadius = 28.dp,
         contentAlignment = Alignment.TopStart,

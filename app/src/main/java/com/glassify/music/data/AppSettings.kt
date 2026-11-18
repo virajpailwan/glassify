@@ -9,32 +9,51 @@ import androidx.compose.runtime.setValue
 
 private fun mix(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
+/**
+ * User settings. All glass values are 0..1.
+ *  - amount:     master "how glassy" slider (0 = solid, 1 = crystal clear glass)
+ *  - blur:       how frosted the glass is
+ *  - refraction: how much the glass bends what is behind it
+ *  - opacity:    how dark / solid the glass tint is
+ *  - shine:      brightness of the glass edge highlight
+ */
 class AppSettings(context: Context) {
-    private val prefs = context.getSharedPreferences("glassify", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("glassify_v2", Context.MODE_PRIVATE)
 
     var amount by mutableFloatStateOf(prefs.getFloat("amount", 0.7f))
         private set
-    var blur by mutableFloatStateOf(prefs.getFloat("blur", 0.35f))
+    var blur by mutableFloatStateOf(prefs.getFloat("blur", 0.3f))
         private set
-    var refraction by mutableFloatStateOf(prefs.getFloat("refraction", 0.63f))
+    var refraction by mutableFloatStateOf(prefs.getFloat("refraction", 0.68f))
         private set
-    var opacity by mutableFloatStateOf(prefs.getFloat("opacity", 0.33f))
+    var opacity by mutableFloatStateOf(prefs.getFloat("opacity", 0.3f))
         private set
     var shine by mutableFloatStateOf(prefs.getFloat("shine", 0.68f))
         private set
+    /** 0 = Smooth (fastest), 1 = Balanced, 2 = Max (sharpest, slowest) */
+    var quality by mutableIntStateOf(prefs.getInt("quality", 0))
+        private set
     var albumBackground by mutableStateOf(prefs.getBoolean("albumBg", true))
         private set
+    /** 0 = title, 1 = artist, 2 = recently added */
     var sort by mutableIntStateOf(prefs.getInt("sort", 0))
         private set
 
+    /** Master slider: moves every glass value together. */
     @JvmName("applyAmount")
     fun setAmount(a: Float) {
         amount = a
-        blur = mix(0.8f, 0.15f, a)
-        refraction = mix(0f, 0.9f, a)
-        opacity = mix(1f, 0.05f, a)
+        blur = mix(0.8f, 0.1f, a)
+        refraction = mix(0f, 0.97f, a)
+        opacity = mix(1f, 0f, a)
         shine = mix(0.15f, 0.9f, a)
         saveGlass()
+    }
+
+    @JvmName("applyQuality")
+    fun setQuality(v: Int) {
+        quality = v
+        prefs.edit().putInt("quality", v).apply()
     }
 
     @JvmName("applyBlur")

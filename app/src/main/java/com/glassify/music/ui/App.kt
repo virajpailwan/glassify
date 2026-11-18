@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
@@ -75,6 +76,7 @@ import com.glassify.music.data.Song
 import com.glassify.music.data.toAlbums
 import com.glassify.music.data.toArtists
 import com.glassify.music.playback.PlayerController
+import com.glassify.music.ui.glass.LocalGlassActive
 import com.glassify.music.ui.glass.glassSource
 import com.glassify.music.ui.glass.glassStyleOf
 import com.glassify.music.ui.glass.rememberGlassBackdrop
@@ -140,7 +142,18 @@ fun GlassifyApp() {
 
     var showPlayer by remember { mutableStateOf(false) }
 
-    val style = glassStyleOf(settings.blur, settings.refraction, settings.opacity, settings.shine)
+    // While the player fully covers the library, stop drawing the library's glass (saves frames).
+    var playerCovering by remember { mutableStateOf(false) }
+    LaunchedEffect(showPlayer) {
+        if (showPlayer) {
+            delay(400)
+            playerCovering = true
+        } else {
+            playerCovering = false
+        }
+    }
+
+    val style = glassStyleOf(settings.blur, settings.refraction, settings.opacity, settings.shine, settings.quality)
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent)) {
         CompositionLocalProvider(LocalGlassStyle provides style) {
@@ -162,14 +175,16 @@ fun GlassifyApp() {
                         },
                     )
                 } else {
-                    MainContent(
-                        settings = settings,
-                        player = player,
-                        songs = songs,
-                        loading = loading,
-                        onRescan = { reload++ },
-                        onOpenPlayer = { showPlayer = true },
-                    )
+                    CompositionLocalProvider(LocalGlassActive provides !playerCovering) {
+                        MainContent(
+                            settings = settings,
+                            player = player,
+                            songs = songs,
+                            loading = loading,
+                            onRescan = { reload++ },
+                            onOpenPlayer = { showPlayer = true },
+                        )
+                    }
                 }
 
                 AnimatedVisibility(
@@ -201,12 +216,14 @@ private fun MainContent(
     val albums = remember(songs) { songs.toAlbums() }
     val artists = remember(songs) { songs.toArtists() }
 
-    BackHandler(enabled = detail != null) { detail = null }
+    var tabsOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = tabsOpen) { tabsOpen = false }
+    BackHandler(enabled = detail != null && !tabsOpen) { detail = null }
 
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val current = player.currentSong
-    val dockHeight = 64.dp + (if (current != null) 76.dp else 0.dp)
+    val dockHeight = 66.dp
     val listPadding = PaddingValues(
         top = statusTop + 72.dp,
         bottom = navBottom + dockHeight + 28.dp,
@@ -269,19 +286,43 @@ private fun MainContent(
                     .padding(top = statusTop + 8.dp, start = 16.dp, end = 16.dp),
             )
 
-            Column(
+            // Convx-style dock: [tab button] [mini player] [search button].
+            // Tap the tab button to open the full tab bar. With nothing playing, the tab bar shows.
+            Row(
                 Modifier
                     .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
                     .padding(start = 14.dp, end = 14.dp, bottom = navBottom + 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (current != null) {
-                    MiniPlayer(player, current, onOpenPlayer)
+                if (current == null || tabsOpen) {
+                    Box(Modifier.weight(1f)) {
+                        TabBar(selected = tab, onSelect = {
+                            tab = it
+                            detail = null
+                            tabsOpen = false
+                        })
+                    }
+                } else {
+                    GlassIconButton(
+                        icon = tab.icon,
+                        onClick = { tabsOpen = true },
+                        size = 58.dp,
+                        description = tab.label,
+                        tint = Accent,
+                    )
+                    Box(Modifier.weight(1f)) { MiniPlayer(player, current, onOpenPlayer) }
+                    GlassIconButton(
+                        icon = Icons.Rounded.Search,
+                        onClick = {
+                            tab = Tab.Songs
+                            detail = null
+                        },
+                        size = 58.dp,
+                        description = "Search",
+                    )
                 }
-                TabBar(selected = tab, onSelect = {
-                    tab = it
-                    detail = null
-                })
             }
         }
     }
@@ -321,29 +362,29 @@ private fun MiniPlayer(player: PlayerController, song: Song, onOpen: () -> Unit)
     GlassBox(
         Modifier
             .fillMaxWidth()
-            .height(66.dp)
-            .clip(RoundedCornerShape(33.dp))
+            .height(58.dp)
+            .clip(RoundedCornerShape(29.dp))
             .clickable(onClick = onOpen),
-        cornerRadius = 33.dp,
+        cornerRadius = 29.dp,
     ) {
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 9.dp),
+            Modifier.fillMaxSize().padding(start = 7.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ArtImage(song, Modifier.size(48.dp), corner = 24.dp)
-            Spacer(Modifier.width(12.dp))
+            ArtImage(song, Modifier.size(44.dp), corner = 12.dp)
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     song.title,
                     color = Color.White,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     song.artist,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = Color.White.copy(alpha = 0.75f),
                     fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -354,19 +395,9 @@ private fun MiniPlayer(player: PlayerController, song: Song, onOpen: () -> Unit)
                 contentDescription = "Play or pause",
                 tint = Color.White,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(46.dp)
                     .clip(CircleShape)
                     .clickable { player.togglePlay() }
-                    .padding(8.dp),
-            )
-            Icon(
-                Icons.Rounded.SkipNext,
-                contentDescription = "Next",
-                tint = Color.White,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .clickable { player.next() }
                     .padding(8.dp),
             )
         }

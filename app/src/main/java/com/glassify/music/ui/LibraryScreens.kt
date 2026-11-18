@@ -77,7 +77,7 @@ fun SongRow(song: Song, playing: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun SearchField(query: String, onQuery: (String) -> Unit) {
-    GlassBox(
+    FlatBox(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)

@@ -75,7 +75,7 @@ fun ArtImage(
     song: Song?,
     modifier: Modifier = Modifier,
     corner: Dp = 12.dp,
-    px: Int = 256,
+    px: Int = 160,
 ) {
     val art = rememberSongArt(song, px)
     Box(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(corner))) {
@@ -107,4 +107,38 @@ fun ArtImage(
             }
         }
     }
+}
+
+/**
+ * A 14x14 pixel copy of the cover. Stretched to the full screen it is a smooth, blurry colour
+ * wash, which costs the graphics chip almost nothing (unlike a live blur).
+ */
+@Composable
+fun rememberWashArt(song: Song?): ImageBitmap? {
+    val context = LocalContext.current
+    val key = song?.let { "w" + artKey(it, 0) }
+    val state = produceState<ImageBitmap?>(
+        initialValue = key?.let { ArtCache.get(it)?.asImageBitmap() },
+        key1 = key,
+    ) {
+        if (song == null || key == null) {
+            value = null
+            return@produceState
+        }
+        val cached = ArtCache.get(key)
+        if (cached != null) {
+            value = cached.asImageBitmap()
+            return@produceState
+        }
+        value = null
+        val tiny = withContext(Dispatchers.IO) {
+            runCatching {
+                val full = context.contentResolver.loadThumbnail(song.uri, Size(96, 96), null)
+                Bitmap.createScaledBitmap(full, 14, 14, true)
+            }.getOrNull()
+        }
+        if (tiny != null) ArtCache.put(key, tiny)
+        value = tiny?.asImageBitmap()
+    }
+    return state.value
 }

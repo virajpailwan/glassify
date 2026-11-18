@@ -176,15 +176,15 @@ fun NowPlayingScreen(player: PlayerController, onClose: () -> Unit) {
                                 tint = if (player.shuffle) Accent else Color.White.copy(alpha = 0.6f),
                                 modifier = Modifier.size(26.dp).clickable { player.toggleShuffle() },
                             )
-                            GlassIconButton(Icons.Rounded.SkipPrevious, { player.previous() }, size = 56.dp, description = "Previous")
-                            GlassIconButton(
+                            FlatIconButton(Icons.Rounded.SkipPrevious, { player.previous() }, size = 56.dp, description = "Previous")
+                            FlatIconButton(
                                 icon = if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                 onClick = { player.togglePlay() },
                                 size = 76.dp,
                                 iconSize = 38.dp,
                                 description = "Play or pause",
                             )
-                            GlassIconButton(Icons.Rounded.SkipNext, { player.next() }, size = 56.dp, description = "Next")
+                            FlatIconButton(Icons.Rounded.SkipNext, { player.next() }, size = 56.dp, description = "Next")
                             Icon(
                                 if (player.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                                 contentDescription = "Repeat",

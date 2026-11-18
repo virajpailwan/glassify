@@ -8,6 +8,7 @@ import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,9 +24,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /** Everything that controls how a glass surface looks. Built from the user's settings. */
@@ -43,32 +47,54 @@ data class GlassStyle(
     val blurDp: Float,
     val bendDp: Float,
     val edgeDp: Float,
+    val tintColor: Color,
     val tintAlpha: Float,
     val shine: Float,
     val saturation: Float,
+    /** 0.25 = glass is computed at quarter size (fast), 1.0 = full size (slow, sharpest). */
+    val resolution: Float,
 ) {
     companion object {
         val Default = GlassStyle(
-            blurDp = 10f,
-            bendDp = 25f,
-            edgeDp = 20f,
-            tintAlpha = 0.3f,
+            blurDp = 4f,
+            bendDp = 26f,
+            edgeDp = 22f,
+            tintColor = Color.White,
+            tintAlpha = 0.14f,
             shine = 0.7f,
-            saturation = 1.5f,
+            saturation = 1.7f,
+            resolution = 0.25f,
         )
     }
 }
 
 private fun mix(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
-fun glassStyleOf(blur: Float, refraction: Float, opacity: Float, shine: Float) = GlassStyle(
-    blurDp = mix(1f, 30f, blur),
-    bendDp = mix(0f, 40f, refraction),
-    edgeDp = mix(8f, 28f, refraction),
-    tintAlpha = mix(0.04f, 0.92f, opacity),
-    shine = shine,
-    saturation = 1f + 0.8f * (1f - opacity),
-)
+private val DarkSurface = Color(0xFF14141C)
+
+/**
+ * Turns the user's 0..1 settings into a [GlassStyle]. The numbers follow Convx's liquid glass:
+ * very light blur, strong edge bending, boosted colour and a light white tint. Moving "opacity"
+ * up fades that light glass into a dark solid panel.
+ */
+fun glassStyleOf(blur: Float, refraction: Float, opacity: Float, shine: Float, quality: Int) =
+    GlassStyle(
+        blurDp = mix(0.5f, 14f, blur),
+        bendDp = mix(0f, 48f, refraction),
+        edgeDp = mix(8f, 32f, refraction),
+        tintColor = lerp(Color.White, DarkSurface, ((opacity - 0.3f) / 0.5f).coerceIn(0f, 1f)),
+        tintAlpha = mix(0.06f, 0.92f, opacity.coerceIn(0f, 1f).pow(1.8f)),
+        shine = shine,
+        saturation = 1f + 1.1f * (1f - opacity.coerceIn(0f, 1f)),
+        resolution = when (quality) {
+            0 -> 0.25f
+            1 -> 0.5f
+            else -> 1f
+        },
+    )
+
+/** Turned off while another screen completely covers this one, to save battery and frames. */
+val LocalGlassActive = compositionLocalOf { true }
 
 /**
  * The thing glass looks at. Wrap the content that should be visible *through* glass with
@@ -136,14 +162,16 @@ half4 main(float2 p) {
 }
 """
 
+/** [scale] shrinks every size so the effect runs on fewer pixels. */
 private fun buildEffect(
     style: GlassStyle,
     w: Int,
     h: Int,
     radiusPx: Float,
     density: Float,
+    scale: Float,
 ): androidx.compose.ui.graphics.RenderEffect {
-    val blurPx = style.blurDp * density
+    val blurPx = style.blurDp * density * scale
     val matrix = ColorMatrix().apply { setSaturation(style.saturation) }
     val saturation = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(matrix))
     var effect: RenderEffect =
@@ -153,13 +181,13 @@ private fun buildEffect(
             saturation
         }
 
-    val bendPx = style.bendDp * density
+    val bendPx = style.bendDp * density * scale
     if (bendPx >= 0.5f) {
         val shader = RuntimeShader(LENS_SHADER)
         shader.setFloatUniform("size", w.toFloat(), h.toFloat())
-        shader.setFloatUniform("radius", radiusPx)
+        shader.setFloatUniform("radius", radiusPx * scale)
         shader.setFloatUniform("bend", bendPx)
-        shader.setFloatUniform("edge", max(style.edgeDp * density, 1f))
+        shader.setFloatUniform("edge", max(style.edgeDp * density * scale, 1f))
         shader.setFloatUniform("chroma", bendPx * 0.08f)
         effect = RenderEffect.createChainEffect(
             RenderEffect.createRuntimeShaderEffect(shader, "content"),
@@ -169,19 +197,25 @@ private fun buildEffect(
     return effect.asComposeRenderEffect()
 }
 
+private val FallbackFill = Color(0xCC15151D)
+
 /** Turns this element into a live liquid-glass surface that looks through [backdrop]. */
 @Composable
 fun Modifier.glass(
     backdrop: GlassBackdrop,
     cornerRadius: Dp,
     style: GlassStyle,
-    tint: Color,
 ): Modifier {
     val density = LocalDensity.current
+    val active = LocalGlassActive.current
     val effectLayer = rememberGraphicsLayer()
     var me by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var pxSize by remember { mutableStateOf(IntSize.Zero) }
     val radiusPx = with(density) { cornerRadius.toPx() }
+    val res = style.resolution.coerceIn(0.1f, 1f)
+
+    val smallW = max(1, (pxSize.width * res).roundToInt())
+    val smallH = max(1, (pxSize.height * res).roundToInt())
 
     val effect = remember(style, pxSize, radiusPx, density.density) {
         if (pxSize.width <= 0 || pxSize.height <= 0) {
@@ -189,10 +223,11 @@ fun Modifier.glass(
         } else {
             buildEffect(
                 style,
-                pxSize.width,
-                pxSize.height,
+                smallW,
+                smallH,
                 min(radiusPx, min(pxSize.width, pxSize.height) / 2f),
                 density.density,
+                res,
             )
         }
     }
@@ -203,50 +238,67 @@ fun Modifier.glass(
         .drawWithContent {
             val source = backdrop.coordinates
             val self = me
-            if (effect != null && source != null && source.isAttached && self != null && self.isAttached) {
+            val r = min(radiusPx, min(size.width, size.height) / 2f)
+            val shape = Path().apply {
+                addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(r)))
+            }
+
+            if (active && effect != null && source != null && source.isAttached &&
+                self != null && self.isAttached && size.width > 0f && size.height > 0f
+            ) {
                 val origin = source.localPositionOf(self, Offset.Zero)
-                val r = min(radiusPx, min(size.width, size.height) / 2f)
+                val sx = smallW / size.width
+                val sy = smallH / size.height
 
                 effectLayer.clip = true
                 effectLayer.renderEffect = effect
-                effectLayer.record(this, layoutDirection, pxSize) {
-                    translate(-origin.x, -origin.y) {
-                        drawLayer(backdrop.layer)
+                // Copy of what is behind this element, shrunk to a small size.
+                effectLayer.record(this, layoutDirection, IntSize(smallW, smallH)) {
+                    scale(sx, sy, pivot = Offset.Zero) {
+                        translate(-origin.x, -origin.y) {
+                            drawLayer(backdrop.layer)
+                        }
                     }
                 }
 
-                val shape = Path().apply {
-                    addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(r)))
-                }
                 clipPath(shape) {
-                    drawLayer(effectLayer)
-                    // colour tint
-                    drawRect(tint.copy(alpha = style.tintAlpha))
+                    // Blurred + bent copy, scaled back up to full size.
+                    scale(1f / sx, 1f / sy, pivot = Offset.Zero) {
+                        drawLayer(effectLayer)
+                    }
+                    // light tint
+                    drawRect(style.tintColor.copy(alpha = style.tintAlpha))
                     // soft light falling from the top, like a glass sheen
                     drawRect(
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.16f * style.shine),
+                                Color.White.copy(alpha = 0.18f * style.shine),
                                 Color.Transparent,
                             ),
-                            endY = size.height * 0.6f,
+                            endY = size.height * 0.55f,
                         ),
                     )
                 }
-                // bright glass rim
+                // thin dark outline so clear glass still reads against bright backgrounds
+                drawPath(shape, Color.Black.copy(alpha = 0.32f), style = Stroke(width = 2.4f * density.density))
+                // bright glass rim, brighter at the top-left and bottom-right like real glass
                 drawPath(
                     shape,
                     Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.85f * style.shine),
-                            Color.White.copy(alpha = 0.06f * style.shine),
-                            Color.White.copy(alpha = 0.45f * style.shine),
+                            Color.White.copy(alpha = 0.9f * style.shine),
+                            Color.White.copy(alpha = 0.05f * style.shine),
+                            Color.White.copy(alpha = 0.5f * style.shine),
                         ),
                         start = Offset.Zero,
                         end = Offset(size.width, size.height),
                     ),
                     style = Stroke(width = 1.2f * density.density),
                 )
+            } else {
+                // Cheap stand-in while glass is not ready or is switched off.
+                clipPath(shape) { drawRect(FallbackFill) }
+                drawPath(shape, Color.White.copy(alpha = 0.18f), style = Stroke(width = 1f * density.density))
             }
             drawContent()
         }

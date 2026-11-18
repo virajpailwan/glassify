@@ -1,6 +1,7 @@
 package com.glassify.music.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +55,7 @@ fun GlassBox(
     val backdrop = LocalGlassBackdrop.current
     val style = LocalGlassStyle.current
     val glassModifier = if (backdrop != null) {
-        Modifier.glass(backdrop, cornerRadius, style, GlassTint)
+        Modifier.glass(backdrop, cornerRadius, style)
     } else {
         Modifier.background(Color(0xCC15151D), RoundedCornerShape(cornerRadius))
     }
@@ -69,10 +70,52 @@ fun GlassIconButton(
     size: Dp = 56.dp,
     iconSize: Dp = 26.dp,
     description: String? = null,
+    tint: Color = Color.White,
 ) {
     GlassBox(
         modifier = modifier.size(size).clip(CircleShape).clickable(onClick = onClick),
         cornerRadius = size,
+    ) {
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(iconSize))
+    }
+}
+
+/** A cheap, flat (non-glass) container. Used where things scroll, to keep the app smooth. */
+@Composable
+fun FlatBox(
+    modifier: Modifier = Modifier,
+    cornerRadius: Dp = 28.dp,
+    contentAlignment: Alignment = Alignment.Center,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(cornerRadius)
+    Box(
+        modifier
+            .background(Color(0x66101018), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.16f), shape),
+        contentAlignment = contentAlignment,
+        content = content,
+    )
+}
+
+/** Round button without glass: translucent white disc with a thin rim. */
+@Composable
+fun FlatIconButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp,
+    iconSize: Dp = 26.dp,
+    description: String? = null,
+) {
+    Box(
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.16f))
+            .border(1.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(iconSize))
     }
@@ -85,9 +128,14 @@ fun GlassPillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    GlassBox(
-        modifier = modifier.height(46.dp).clip(RoundedCornerShape(50)).clickable(onClick = onClick),
-        cornerRadius = 50.dp,
+    Box(
+        modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.16f))
+            .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Row(
             Modifier.padding(horizontal = 20.dp),

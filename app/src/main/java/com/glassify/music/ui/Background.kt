@@ -8,11 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.glassify.music.data.Song
@@ -51,19 +50,17 @@ fun AppBackground(song: Song?, useArt: Boolean, modifier: Modifier = Modifier) {
         BlobField()
         if (useArt && song != null) {
             Crossfade(targetState = song, label = "background") { s ->
-                val art = rememberSongArt(s, 200)
+                val art = rememberWashArt(s)
                 if (art != null) {
                     Box(Modifier.fillMaxSize()) {
                         Image(
                             bitmap = art,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .scale(1.35f)
-                                .blur(40.dp),
+                            filterQuality = FilterQuality.High,
+                            modifier = Modifier.fillMaxSize(),
                         )
-                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)))
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
                     }
                 }
             }

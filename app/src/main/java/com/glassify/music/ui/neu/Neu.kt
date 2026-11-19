@@ -1,6 +1,7 @@
 package com.glassify.music.ui.neu
 
 import android.graphics.Paint as AndroidPaint
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat

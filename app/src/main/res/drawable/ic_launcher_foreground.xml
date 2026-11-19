@@ -1,17 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- glass pane -->
-    <path
-        android:fillColor="#55FFFFFF"
-        android:strokeColor="#CCFFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M30,34 h48 a8,8 0 0 1 8,8 v24 a8,8 0 0 1 -8,8 h-48 a8,8 0 0 1 -8,-8 v-24 a8,8 0 0 1 8,-8 z" />
-    <!-- music note -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M60,40 v21.5 a6,5 0 1 1 -3,-4.3 V46 l-12,3 v14.5 a6,5 0 1 1 -3,-4.3 V47 a2,2 0 0 1 1.5,-1.9 l13.5,-3.4 a2,2 0 0 1 3,1.7 z" />
+    <!-- dark shadow, bottom right -->
+    <group android:translateX="3" android:translateY="3">
+        <path android:fillColor="#FF14151A" android:pathData="M40,24 h28 a16,16 0 0 1 16,16 v28 a16,16 0 0 1 -16,16 h-28 a16,16 0 0 1 -16,-16 v-28 a16,16 0 0 1 16,-16 z" />
+    </group>
+    <!-- light highlight, top left -->
+    <group android:translateX="-2.5" android:translateY="-2.5">
+        <path android:fillColor="#FF3A3B4A" android:pathData="M40,24 h28 a16,16 0 0 1 16,16 v28 a16,16 0 0 1 -16,16 h-28 a16,16 0 0 1 -16,-16 v-28 a16,16 0 0 1 16,-16 z" />
+    </group>
+    <!-- raised plate -->
+    <path android:pathData="M40,24 h28 a16,16 0 0 1 16,16 v28 a16,16 0 0 1 -16,16 h-28 a16,16 0 0 1 -16,-16 v-28 a16,16 0 0 1 16,-16 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="24" android:startY="24" android:endX="84" android:endY="84">
+                <item android:offset="0" android:color="#FF30313E" />
+                <item android:offset="1" android:color="#FF23242D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <group android:scaleX="1.35" android:scaleY="1.35" android:pivotX="52.5" android:pivotY="55">
+        <!-- note shadow -->
+        <group android:translateX="1.2" android:translateY="1.6">
+            <path android:fillColor="#AA101116" android:pathData="M60,40 v21.5 a6,5 0 1 1 -3,-4.3 V46 l-12,3 v14.5 a6,5 0 1 1 -3,-4.3 V47 a2,2 0 0 1 1.5,-1.9 l13.5,-3.4 a2,2 0 0 1 3,1.7 z" />
+        </group>
+        <!-- gradient violet note -->
+        <path android:pathData="M60,40 v21.5 a6,5 0 1 1 -3,-4.3 V46 l-12,3 v14.5 a6,5 0 1 1 -3,-4.3 V47 a2,2 0 0 1 1.5,-1.9 l13.5,-3.4 a2,2 0 0 1 3,1.7 z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="42" android:startY="40" android:endX="64" android:endY="70">
+                    <item android:offset="0" android:color="#FFD8CCFF" />
+                    <item android:offset="0.5" android:color="#FFA78BFA" />
+                    <item android:offset="1" android:color="#FF7C8CFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
 </vector>

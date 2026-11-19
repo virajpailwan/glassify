@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -27,6 +28,14 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        // Hook the equalizer to the player's audio output.
+        AudioFx.attach(applicationContext, player.audioSessionId)
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                AudioFx.attach(applicationContext, audioSessionId)
+            }
+        })
+
         val openApp = PendingIntent.getActivity(
             this,
             0,
@@ -48,6 +57,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        AudioFx.release()
         session?.run {
             player.release()
             release()

@@ -1,273 +1,303 @@
 package com.glassify.music.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.ViewList
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.glassify.music.data.AlbumInfo
-import com.glassify.music.data.ArtistInfo
+import com.glassify.music.data.AppStore
 import com.glassify.music.data.Song
+import com.glassify.music.data.toAlbums
+import com.glassify.music.data.toArtists
+import com.glassify.music.playback.PlayerController
+import com.glassify.music.ui.neu.AccentColor
+import com.glassify.music.ui.neu.NeuButton
+import com.glassify.music.ui.neu.NeuChip
+import com.glassify.music.ui.neu.NeuColors
+import com.glassify.music.ui.neu.neuInset
+import com.glassify.music.ui.neu.plainClickable
+
+sealed interface Detail {
+    data class OfAlbum(val id: Long) : Detail
+    data class OfArtist(val name: String) : Detail
+    data class OfPlaylist(val name: String) : Detail
+}
+
+/** Adds one [SongRow] per song; tapping plays the whole [list] from that song. */
+fun LazyListScope.songItems(
+    list: List<Song>,
+    player: PlayerController,
+    onPlay: () -> Unit = {},
+    onMore: (Song) -> Unit,
+) {
+    itemsIndexed(list) { i, s ->
+        SongRow(
+            s,
+            s.id == player.currentSong?.id,
+            { onPlay(); player.play(list, i) },
+            { onMore(s) },
+        )
+    }
+}
 
 @Composable
-fun SongRow(song: Song, playing: Boolean, onClick: () -> Unit) {
+fun EntryRow(title: String, subtitle: String, art: Song?, onClick: () -> Unit) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().plainClickable(onClick).padding(horizontal = 20.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ArtImage(song, Modifier.size(52.dp), corner = 12.dp)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
+        Box(Modifier.size(54.dp).neuInset(15.dp).padding(3.dp)) {
+            ArtImage(art, Modifier.fillMaxSize(), corner = 12.dp, px = 128)
+        }
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text(
-                song.title,
-                color = if (playing) Accent else Color.White,
+                title,
+                color = NeuColors.TextMain,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                song.artist,
-                color = Color.White.copy(alpha = 0.65f),
+                subtitle,
+                color = NeuColors.TextDim,
                 fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.width(10.dp))
-        Text(formatTime(song.durationMs), color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
     }
 }
 
-@Composable
-private fun SearchField(query: String, onQuery: (String) -> Unit) {
-    FlatBox(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .height(48.dp),
-        cornerRadius = 24.dp,
-    ) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(10.dp))
-            androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) {
-                    Text("Search your music", color = Color.White.copy(alpha = 0.5f), fontSize = 16.sp)
-                }
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQuery,
-                    singleLine = true,
-                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    cursorBrush = SolidColor(Color.White),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (query.isNotEmpty()) {
-                Icon(
-                    Icons.Rounded.Close,
-                    null,
-                    tint = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.size(22.dp).clickable { onQuery("") },
-                )
-            }
-        }
-    }
-}
+private class Entry(val title: String, val subtitle: String, val art: Song?, val onClick: () -> Unit)
 
 @Composable
-fun SongsScreen(
+fun LibraryScreen(
     songs: List<Song>,
-    current: Song?,
-    padding: PaddingValues,
-    query: String,
-    onQuery: (String) -> Unit,
-    sort: Int,
-    onPlay: (List<Song>, Int) -> Unit,
-    onShuffleAll: (List<Song>) -> Unit,
+    store: AppStore,
+    player: PlayerController,
+    onDetail: (Detail) -> Unit,
 ) {
-    val shown = remember(songs, query, sort) {
-        val filtered = if (query.isBlank()) songs else songs.filter {
-            it.title.contains(query, ignoreCase = true) ||
-                it.artist.contains(query, ignoreCase = true) ||
-                it.album.contains(query, ignoreCase = true)
-        }
-        when (sort) {
-            1 -> filtered.sortedBy { it.artist.lowercase() }
-            2 -> filtered.sortedByDescending { it.dateAdded }
-            else -> filtered.sortedBy { it.title.lowercase() }
-        }
-    }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        item { SearchField(query, onQuery) }
-        item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                GlassPillButton("Shuffle all", Icons.Rounded.Shuffle, { onShuffleAll(shown) })
-            }
-        }
-        items(shown, key = { it.id }) { song ->
-            SongRow(song, playing = song.id == current?.id) {
-                onPlay(shown, shown.indexOf(song))
-            }
-        }
-    }
-}
+    var section by remember { mutableIntStateOf(0) }
+    var menuSong by remember { mutableStateOf<Song?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
 
-@Composable
-fun AlbumsScreen(albums: List<AlbumInfo>, padding: PaddingValues, onOpen: (AlbumInfo) -> Unit) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = padding.calculateTopPadding(),
-            bottom = padding.calculateBottomPadding(),
-        ),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        gridItems(albums, key = { it.id }) { album ->
-            Column(Modifier.clickable { onOpen(album) }) {
-                ArtImage(
-                    album.songs.firstOrNull(),
-                    Modifier.fillMaxWidth().aspectRatio(1f),
-                    corner = 18.dp,
-                    px = 400,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    album.title,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    album.artist,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    val sorted = remember(songs, store.sort) {
+        when (store.sort) {
+            1 -> songs.sortedBy { it.artist.lowercase() }
+            2 -> songs.sortedByDescending { it.dateAdded }
+            else -> songs.sortedBy { it.title.lowercase() }
+        }
+    }
+    val albums = remember(songs) { songs.toAlbums() }
+    val artists = remember(songs) { songs.toArtists() }
+
+    val entries: List<Entry> = when (section) {
+        0 -> sorted.mapIndexed { i, s -> Entry(s.title, s.artist, s) { player.play(sorted, i) } }
+        1 -> albums.map { a ->
+            Entry(a.title, "${a.artist} · ${a.songs.size} songs", a.songs.first()) { onDetail(Detail.OfAlbum(a.id)) }
+        }
+        2 -> artists.map { a ->
+            Entry(a.name, "${a.songs.size} songs", a.songs.first()) { onDetail(Detail.OfArtist(a.name)) }
+        }
+        else -> {
+            val byId = songs.associateBy { it.id }
+            store.playlists.map { p ->
+                Entry(p.name, "${p.ids.size} songs", p.ids.firstNotNullOfOrNull { byId[it] }) {
+                    onDetail(Detail.OfPlaylist(p.name))
+                }
             }
         }
     }
-}
 
-@Composable
-fun ArtistsScreen(artists: List<ArtistInfo>, padding: PaddingValues, onOpen: (ArtistInfo) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        items(artists, key = { it.name }) { artist ->
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader("Library") {
+            if (section == 3) {
+                NeuButton(Icons.Rounded.Add, { creating = true }, size = 42.dp, iconSize = 20.dp, description = "New playlist")
+            }
+            NeuButton(
+                if (store.gridView) Icons.Rounded.ViewList else Icons.Rounded.GridView,
+                { store.updateGrid(!store.gridView) },
+                size = 42.dp,
+                iconSize = 20.dp,
+                description = "Toggle grid",
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            listOf("Songs", "Albums", "Artists", "Playlists").forEachIndexed { i, t ->
+                NeuChip(t, section == i, { section = i })
+            }
+        }
+        if (section == 0) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(artist) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ArtImage(artist.songs.firstOrNull(), Modifier.size(56.dp), corner = 28.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        artist.name,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${artist.songs.size} songs",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                    )
+                Text("Sort", color = NeuColors.TextDim, fontSize = 13.sp)
+                listOf("Title", "Artist", "Recent").forEachIndexed { i, t ->
+                    NeuChip(t, store.sort == i, { store.updateSort(i) })
                 }
             }
         }
+
+        Box(Modifier.weight(1f)) {
+            if (entries.isEmpty()) {
+                EmptyHint(
+                    if (section == 3) "No playlists yet. Tap + to create one." else "No music found yet.",
+                )
+            } else if (store.gridView) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    items(entries) { e -> ArtTile(e.art, e.title, e.subtitle, Modifier, e.onClick) }
+                }
+            } else if (section == 0) {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    songItems(sorted, player) { menuSong = it }
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(entries) { e -> EntryRow(e.title, e.subtitle, e.art, e.onClick) }
+                }
+            }
+        }
+    }
+
+    menuSong?.let { SongOptionsDialog(it, store, player, null) { menuSong = null } }
+
+    if (creating) {
+        AlertDialog(
+            onDismissRequest = { creating = false },
+            containerColor = NeuColors.Raised,
+            title = { Text("New playlist", color = NeuColors.TextMain) },
+            text = { NeuTextField(newName, { newName = it }, "Playlist name") },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.createPlaylist(newName)
+                    newName = ""
+                    creating = false
+                }) { Text("Create", color = AccentColor) }
+            },
+            dismissButton = {
+                TextButton(onClick = { creating = false }) { Text("Cancel", color = NeuColors.TextDim) }
+            },
+        )
     }
 }
 
-/** Songs of one album or one artist. */
 @Composable
 fun DetailScreen(
-    title: String,
-    subtitle: String,
+    detail: Detail,
     songs: List<Song>,
-    current: Song?,
-    padding: PaddingValues,
-    onPlay: (List<Song>, Int) -> Unit,
-    onShuffle: (List<Song>) -> Unit,
+    store: AppStore,
+    player: PlayerController,
+    onBack: () -> Unit,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        item {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                ArtImage(songs.firstOrNull(), Modifier.size(220.dp), corner = 28.dp, px = 600)
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    title,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-                Text(subtitle, color = Color.White.copy(alpha = 0.65f), fontSize = 14.sp)
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GlassPillButton("Play", Icons.Rounded.PlayArrow, { onPlay(songs, 0) })
-                    GlassPillButton("Shuffle", Icons.Rounded.Shuffle, { onShuffle(songs) })
-                }
-                Spacer(Modifier.height(12.dp))
-            }
+    var menuSong by remember { mutableStateOf<Song?>(null) }
+
+    val title: String
+    val list: List<Song>
+    val playlist: String? = (detail as? Detail.OfPlaylist)?.name
+    when (detail) {
+        is Detail.OfAlbum -> {
+            val a = songs.toAlbums().firstOrNull { it.id == detail.id }
+            title = a?.title ?: "Album"
+            list = a?.songs?.sortedBy { it.track } ?: emptyList()
         }
-        items(songs, key = { it.id }) { song ->
-            SongRow(song, playing = song.id == current?.id) {
-                onPlay(songs, songs.indexOf(song))
-            }
+        is Detail.OfArtist -> {
+            title = detail.name
+            list = songs.filter { it.artist == detail.name }
+        }
+        is Detail.OfPlaylist -> {
+            title = detail.name
+            val byId = songs.associateBy { it.id }
+            list = store.playlists.firstOrNull { it.name == detail.name }?.ids?.mapNotNull { byId[it] } ?: emptyList()
         }
     }
+
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(title, onBack = onBack) {
+            if (playlist != null) {
+                NeuButton(
+                    Icons.Rounded.Delete,
+                    { store.deletePlaylist(playlist); onBack() },
+                    size = 42.dp,
+                    iconSize = 20.dp,
+                    description = "Delete playlist",
+                )
+            }
+            NeuButton(
+                Icons.Rounded.Shuffle,
+                { if (list.isNotEmpty()) player.shuffleAll(list) },
+                size = 42.dp,
+                iconSize = 20.dp,
+                description = "Shuffle",
+            )
+            NeuButton(
+                Icons.Rounded.PlayArrow,
+                { if (list.isNotEmpty()) player.play(list, 0) },
+                size = 46.dp,
+                accent = true,
+                description = "Play all",
+            )
+        }
+        Text(
+            "${list.size} songs",
+            color = NeuColors.TextDim,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
+        )
+        if (list.isEmpty()) {
+            EmptyHint("Nothing here yet. Use the ⋮ menu on any song to add it to a playlist.")
+        }
+        LazyColumn(Modifier.weight(1f)) {
+            songItems(list, player) { menuSong = it }
+        }
+    }
+
+    menuSong?.let { SongOptionsDialog(it, store, player, playlist) { menuSong = null } }
 }

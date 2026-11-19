@@ -3,9 +3,11 @@ package com.glassify.music.playback
 import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -22,6 +24,7 @@ class PlayerController(private val context: Context) {
 
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     var currentSong by mutableStateOf<Song?>(null)
         private set
@@ -35,6 +38,24 @@ class PlayerController(private val context: Context) {
         private set
     var repeatMode by mutableIntStateOf(Player.REPEAT_MODE_OFF)
         private set
+    var queue by mutableStateOf<List<Song>>(emptyList())
+        private set
+    var currentIndex by mutableIntStateOf(0)
+        private set
+    /** Minutes chosen for the sleep timer, 0 = off. */
+    var sleepMinutes by mutableIntStateOf(0)
+        private set
+    var sleepEndsAt by mutableLongStateOf(0L)
+        private set
+
+    /** Called whenever a different song starts. Used to build "recently played". */
+    var onSongChanged: ((Song) -> Unit)? = null
+
+    private val sleepRunnable = Runnable {
+        controller?.pause()
+        sleepMinutes = 0
+        sleepEndsAt = 0L
+    }
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -58,6 +79,7 @@ class PlayerController(private val context: Context) {
     }
 
     fun release() {
+        handler.removeCallbacks(sleepRunnable)
         controller?.removeListener(listener)
         future?.let { MediaController.releaseFuture(it) }
         future = null
@@ -69,9 +91,13 @@ class PlayerController(private val context: Context) {
         isPlaying = c.isPlaying
         shuffle = c.shuffleModeEnabled
         repeatMode = c.repeatMode
-        val item = c.currentMediaItem
-        val song = item?.toSong()
-        if (song?.id != currentSong?.id) currentSong = song
+        currentIndex = c.currentMediaItemIndex.coerceAtLeast(0)
+        queue = List(c.mediaItemCount) { i -> c.getMediaItemAt(i).toSong() }.filterNotNull()
+        val song = c.currentMediaItem?.toSong()
+        if (song?.id != currentSong?.id) {
+            currentSong = song
+            if (song != null) onSongChanged?.invoke(song)
+        }
         durationMs = if (c.duration > 0) c.duration else (song?.durationMs ?: 0L)
         positionMs = c.currentPosition.coerceAtLeast(0L)
     }
@@ -100,6 +126,38 @@ class PlayerController(private val context: Context) {
         c.play()
     }
 
+    fun playNext(song: Song) {
+        val c = controller ?: return
+        if (c.mediaItemCount == 0) {
+            play(listOf(song), 0)
+        } else {
+            c.addMediaItem(c.currentMediaItemIndex + 1, song.toMediaItem())
+        }
+    }
+
+    fun addToQueue(song: Song) {
+        val c = controller ?: return
+        if (c.mediaItemCount == 0) {
+            play(listOf(song), 0)
+        } else {
+            c.addMediaItem(song.toMediaItem())
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        controller?.removeMediaItem(index)
+    }
+
+    fun moveInQueue(from: Int, to: Int) {
+        controller?.moveMediaItem(from, to)
+    }
+
+    fun skipTo(index: Int) {
+        val c = controller ?: return
+        c.seekTo(index, 0L)
+        c.play()
+    }
+
     fun togglePlay() {
         val c = controller ?: return
         if (c.isPlaying) c.pause() else c.play()
@@ -124,6 +182,19 @@ class PlayerController(private val context: Context) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    /** Pauses playback after [minutes]. 0 turns the timer off. */
+    fun updateSleepTimer(minutes: Int) {
+        handler.removeCallbacks(sleepRunnable)
+        sleepMinutes = minutes
+        if (minutes <= 0) {
+            sleepEndsAt = 0L
+        } else {
+            val ms = minutes * 60_000L
+            sleepEndsAt = System.currentTimeMillis() + ms
+            handler.postDelayed(sleepRunnable, ms)
         }
     }
 }

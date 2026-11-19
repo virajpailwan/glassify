@@ -66,19 +66,6 @@ fun SettingsScreen(
             )
         }
 
-        SettingsCard("Playback") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Animated visualizer", color = NeuColors.TextMain, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                NeuToggle(store.showVisualizer) { store.updateVisualizer(it) }
-            }
-            Text(
-                "Decorative bars on the Now Playing screen. They move while music plays.",
-                color = NeuColors.TextDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
         SettingsCard("Sleep timer") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0, 15, 30, 45, 60).forEach { m ->

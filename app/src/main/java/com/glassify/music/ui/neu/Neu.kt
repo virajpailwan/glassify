@@ -227,6 +227,8 @@ fun NeuChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modi
             color = if (selected) AccentColor else NeuColors.TextMain,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }

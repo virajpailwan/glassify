@@ -1,5 +1,7 @@
 package com.glassify.music.ui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -161,8 +163,8 @@ fun LibraryScreen(
             )
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             listOf("Songs", "Albums", "Artists", "Playlists").forEachIndexed { i, t ->
                 NeuChip(t, section == i, { section = i })

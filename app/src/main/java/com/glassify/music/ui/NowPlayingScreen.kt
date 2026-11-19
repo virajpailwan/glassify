@@ -150,13 +150,6 @@ fun NowPlayingScreen(
                     )
                 }
 
-                if (store.showVisualizer) {
-                    Visualizer(
-                        playing = player.isPlaying,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).height(24.dp),
-                    )
-                }
-
                 // progress
                 val duration = player.durationMs.coerceAtLeast(1L)
                 val fraction = scrubbing ?: (player.positionMs.toFloat() / duration)

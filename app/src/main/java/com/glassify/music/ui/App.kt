@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -17,6 +18,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -305,25 +308,37 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
     ) {
         NavTab.entries.forEachIndexed { i, t ->
             val on = i == selected
-            Column(
+            val tint by animateColorAsState(if (on) AccentColor else NeuColors.TextDim, tween(220), label = "navTint")
+            val well by animateFloatAsState(if (on) 1f else 0f, tween(220), label = "navWell")
+            val lift by animateFloatAsState(if (on) 1.15f else 1f, tween(220), label = "navLift")
+            Box(
                 Modifier
                     .weight(1f)
-                    .then(if (on) Modifier.neuInset(18.dp) else Modifier)
-                    .plainClickable { onSelect(i) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .plainClickable { onSelect(i) },
             ) {
-                Icon(
-                    t.icon,
-                    contentDescription = t.label,
-                    tint = if (on) AccentColor else NeuColors.TextDim,
-                    modifier = Modifier.size(22.dp),
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = well }
+                        .neuInset(18.dp),
                 )
-                Text(
-                    t.label,
-                    color = if (on) AccentColor else NeuColors.TextDim,
-                    fontSize = 11.sp,
-                )
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        t.icon,
+                        contentDescription = t.label,
+                        tint = tint,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .graphicsLayer {
+                                scaleX = lift
+                                scaleY = lift
+                            },
+                    )
+                    Text(t.label, color = tint, fontSize = 11.sp)
+                }
             }
         }
     }

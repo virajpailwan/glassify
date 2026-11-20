@@ -3,7 +3,15 @@ package com.glassify.music.ui
 import android.content.Context
 import android.media.AudioManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.LaunchedEffect
+import com.glassify.music.ui.neu.NeuChip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,11 +27,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QueueMusic
@@ -70,7 +77,6 @@ fun NowPlayingScreen(
     store: AppStore,
     onClose: () -> Unit,
     onQueue: () -> Unit,
-    onEqualizer: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
 
@@ -82,7 +88,8 @@ fun NowPlayingScreen(
         mutableFloatStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume)
     }
     var scrubbing by remember { mutableStateOf<Float?>(null) }
-    var showLyrics by remember { mutableStateOf(false) }
+    var showSleep by remember { mutableStateOf(false) }
+    val artScale by animateFloatAsState(if (player.isPlaying) 1f else 0.93f, tween(400), label = "art")
 
     Box(
         Modifier
@@ -113,9 +120,21 @@ fun NowPlayingScreen(
                 Spacer(Modifier.weight(1f))
 
                 // artwork in a raised plate with a recessed well
-                Box(Modifier.padding(10.dp).size(frame).neuRaised(36.dp, 8.dp).padding(14.dp)) {
+                Box(
+                    Modifier
+                        .padding(10.dp)
+                        .size(frame)
+                        .graphicsLayer {
+                            scaleX = artScale
+                            scaleY = artScale
+                        }
+                        .neuRaised(36.dp, 8.dp)
+                        .padding(14.dp),
+                ) {
                     Box(Modifier.fillMaxSize().neuInset(26.dp).padding(8.dp)) {
-                        ArtImage(song, Modifier.fillMaxSize(), corner = 20.dp, px = 800)
+                        Crossfade(targetState = song, animationSpec = tween(350), label = "cover") { sg ->
+                            ArtImage(sg, Modifier.fillMaxSize(), corner = 20.dp, px = 800)
+                        }
                     }
                 }
 
@@ -141,7 +160,16 @@ fun NowPlayingScreen(
                         )
                     }
                     val fav = song != null && song.id in store.favourites
+                    val pop = remember { Animatable(1f) }
+                    LaunchedEffect(fav) {
+                        pop.animateTo(1.3f, tween(90))
+                        pop.animateTo(1f, spring())
+                    }
                     NeuButton(
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = pop.value
+                            scaleY = pop.value
+                        },
                         icon = if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         onClick = { song?.let { store.toggleFavourite(it.id) } },
                         size = 42.dp,
@@ -228,28 +256,49 @@ fun NowPlayingScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NeuButton(Icons.Rounded.Notes, { showLyrics = true }, size = 42.dp, iconSize = 20.dp, description = "Lyrics")
-                    NeuButton(Icons.Rounded.Equalizer, onEqualizer, size = 42.dp, iconSize = 20.dp, description = "Equalizer")
+                    NeuButton(
+                        Icons.Rounded.Bedtime,
+                        { showSleep = true },
+                        size = 42.dp,
+                        iconSize = 20.dp,
+                        active = player.sleepMinutes > 0,
+                        description = "Sleep timer",
+                    )
                     NeuButton(Icons.Rounded.QueueMusic, onQueue, size = 42.dp, iconSize = 20.dp, description = "Queue")
                 }
             }
         }
     }
 
-    if (showLyrics) {
+    if (showSleep) {
         AlertDialog(
-            onDismissRequest = { showLyrics = false },
+            onDismissRequest = { showSleep = false },
             containerColor = NeuColors.Raised,
-            title = { Text("Lyrics", color = NeuColors.TextMain) },
+            title = { Text("Sleep timer", color = NeuColors.TextMain) },
             text = {
-                Text(
-                    "Lyrics are not available yet. Synced lyrics from .lrc files are planned for a later version.",
-                    color = NeuColors.TextDim,
-                    fontSize = 15.sp,
-                )
+                Column {
+                    Text(
+                        if (player.sleepMinutes > 0) "Music will pause in ${player.sleepMinutes} min." else "Pause the music after:",
+                        color = NeuColors.TextDim,
+                        fontSize = 14.sp,
+                    )
+                    Row(
+                        Modifier.padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        listOf(0, 15, 30, 45, 60).forEach { m ->
+                            NeuChip(
+                                if (m == 0) "Off" else "$m",
+                                player.sleepMinutes == m,
+                                { player.updateSleepTimer(m); showSleep = false },
+                            )
+                        }
+                    }
+                    Text("minutes", color = NeuColors.TextDim, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+                }
             },
             confirmButton = {
-                TextButton(onClick = { showLyrics = false }) { Text("OK", color = AccentColor) }
+                TextButton(onClick = { showSleep = false }) { Text("Close", color = AccentColor) }
             },
         )
     }

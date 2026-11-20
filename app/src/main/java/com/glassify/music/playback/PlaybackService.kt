@@ -28,13 +28,6 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        // Hook the equalizer to the player's audio output.
-        AudioFx.attach(applicationContext, player.audioSessionId)
-        player.addListener(object : Player.Listener {
-            override fun onAudioSessionIdChanged(audioSessionId: Int) {
-                AudioFx.attach(applicationContext, audioSessionId)
-            }
-        })
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -57,7 +50,6 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        AudioFx.release()
         session?.run {
             player.release()
             release()

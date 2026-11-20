@@ -5,7 +5,14 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -57,7 +64,6 @@ import androidx.compose.ui.unit.sp
 import com.glassify.music.data.AppStore
 import com.glassify.music.data.MusicRepository
 import com.glassify.music.data.Song
-import com.glassify.music.playback.AudioFx
 import com.glassify.music.playback.PlayerController
 import com.glassify.music.ui.neu.AccentColor
 import com.glassify.music.ui.neu.AccentIndex
@@ -71,7 +77,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 enum class NavTab(val label: String, val icon: ImageVector) {
-    Home("Home", Icons.Rounded.Home),
     Search("Search", Icons.Rounded.Search),
     Library("Library", Icons.Rounded.LibraryMusic),
     Settings("Settings", Icons.Rounded.Settings),
@@ -84,7 +89,6 @@ fun NeumoApp() {
     val player = remember { PlayerController(context) }
     remember {
         AccentIndex = store.accent
-        AudioFx.load(context)
         player.onSongChanged = { store.pushRecent(it.id) }
         true
     }
@@ -163,41 +167,49 @@ private fun PermissionScreen(onRequest: () -> Unit) {
 
 @Composable
 private fun Shell(songs: List<Song>, store: AppStore, player: PlayerController, onRescan: () -> Unit) {
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(NavTab.Library.ordinal) }
     var detail by remember { mutableStateOf<Detail?>(null) }
     var showNow by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
-    var showEq by remember { mutableStateOf(false) }
 
     BackHandler(enabled = detail != null) { detail = null }
-    BackHandler(enabled = detail == null && tab != 0) { tab = 0 }
+    BackHandler(enabled = detail == null && tab != NavTab.Library.ordinal) { tab = NavTab.Library.ordinal }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)) {
-                val d = detail
-                if (d != null) {
-                    DetailScreen(d, songs, store, player, onBack = { detail = null })
-                } else {
-                    when (NavTab.entries[tab]) {
-                        NavTab.Home -> HomeScreen(
-                            songs, store, player,
-                            onDetail = { detail = it },
-                            onSettings = { tab = NavTab.Settings.ordinal },
-                        )
-                        NavTab.Search -> SearchScreen(songs, store, player, onDetail = { detail = it })
-                        NavTab.Library -> LibraryScreen(songs, store, player, onDetail = { detail = it })
-                        NavTab.Settings -> SettingsScreen(
-                            songCount = songs.size,
-                            store = store,
-                            player = player,
-                            onEqualizer = { showEq = true },
-                            onRescan = onRescan,
-                        )
+                val screen: Any = detail ?: tab
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        if (targetState is Detail) {
+                            (slideInHorizontally(tween(260)) { it / 4 } + fadeIn(tween(260))) togetherWith
+                                (fadeOut(tween(160)))
+                        } else if (initialState is Detail) {
+                            fadeIn(tween(220)) togetherWith
+                                (slideOutHorizontally(tween(220)) { it / 4 } + fadeOut(tween(220)))
+                        } else {
+                            fadeIn(tween(220)) togetherWith fadeOut(tween(140))
+                        }
+                    },
+                    label = "screen",
+                ) { s ->
+                    if (s is Detail) {
+                        DetailScreen(s, songs, store, player, onBack = { detail = null })
+                    } else {
+                        when (NavTab.entries[s as Int]) {
+                            NavTab.Search -> SearchScreen(songs, store, player, onDetail = { detail = it })
+                            NavTab.Library -> LibraryScreen(songs, store, player, onDetail = { detail = it })
+                            NavTab.Settings -> SettingsScreen(songCount = songs.size, onRescan = onRescan)
+                        }
                     }
                 }
             }
-            if (player.currentSong != null) {
+            AnimatedVisibility(
+                visible = player.currentSong != null,
+                enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)),
+                exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(200)),
+            ) {
                 MiniPlayer(player, onOpen = { showNow = true })
             }
             BottomNav(tab) { tab = it; detail = null }
@@ -208,11 +220,9 @@ private fun Shell(songs: List<Song>, store: AppStore, player: PlayerController, 
                 player, store,
                 onClose = { showNow = false },
                 onQueue = { showQueue = true },
-                onEqualizer = { showEq = true },
             )
         }
         Overlay(showQueue) { QueueScreen(player, onBack = { showQueue = false }) }
-        Overlay(showEq) { EqualizerScreen(onBack = { showEq = false }) }
     }
 }
 
@@ -232,7 +242,8 @@ private fun Overlay(visible: Boolean, content: @Composable () -> Unit) {
 @Composable
 private fun MiniPlayer(player: PlayerController, onOpen: () -> Unit) {
     val song = player.currentSong ?: return
-    val fraction = if (player.durationMs > 0) player.positionMs.toFloat() / player.durationMs else 0f
+    val target = if (player.durationMs > 0) player.positionMs.toFloat() / player.durationMs else 0f
+    val fraction by animateFloatAsState(target, tween(500), label = "mini")
     Column(
         Modifier
             .fillMaxWidth()

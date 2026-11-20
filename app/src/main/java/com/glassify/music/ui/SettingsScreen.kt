@@ -41,46 +41,10 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
 @Composable
 fun SettingsScreen(
     songCount: Int,
-    store: AppStore,
-    player: PlayerController,
-    onEqualizer: () -> Unit,
     onRescan: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader("Settings")
-
-        SettingsCard("Theme") {
-            Text("Dark neumorphic. Pick an accent colour:", color = NeuColors.TextDim, fontSize = 13.sp)
-            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NeuChip("Violet", store.accent == 0, { store.updateAccent(0) })
-                NeuChip("Blue", store.accent == 1, { store.updateAccent(1) })
-            }
-        }
-
-        SettingsCard("Audio") {
-            Text(
-                "Equalizer, bass boost and virtualizer",
-                color = AccentColor,
-                fontSize = 15.sp,
-                modifier = Modifier.plainClickable(onEqualizer).padding(vertical = 4.dp),
-            )
-        }
-
-        SettingsCard("Sleep timer") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(0, 15, 30, 45, 60).forEach { m ->
-                    NeuChip(if (m == 0) "Off" else "${m}m", player.sleepMinutes == m, { player.updateSleepTimer(m) })
-                }
-            }
-            if (player.sleepMinutes > 0) {
-                Text(
-                    "Music will pause after ${player.sleepMinutes} minutes.",
-                    color = NeuColors.TextDim,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        }
 
         SettingsCard("Library") {
             Text("$songCount songs found", color = NeuColors.TextDim, fontSize = 13.sp)

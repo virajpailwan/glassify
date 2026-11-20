@@ -83,7 +83,6 @@ fun SearchScreen(
     var menuSong by remember { mutableStateOf<Song?>(null) }
     val q = query.trim()
 
-    val suggestions = remember(songs) { songs.shuffled().take(8) }
     val songHits = remember(songs, q) {
         if (q.isEmpty()) emptyList()
         else songs.filter {
@@ -131,8 +130,9 @@ fun SearchScreen(
                         }
                     }
                 }
-                item { SectionTitle("Suggested for you") }
-                songItems(suggestions, player) { menuSong = it }
+                if (store.recentSearches.isEmpty()) {
+                    item { EmptyHint("Search your songs, albums and artists.") }
+                }
             } else {
                 if (songHits.isEmpty() && albumHits.isEmpty() && artistHits.isEmpty()) {
                     item { EmptyHint("Nothing found for \"$q\".") }

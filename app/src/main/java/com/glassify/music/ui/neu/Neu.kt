@@ -2,6 +2,7 @@ package com.glassify.music.ui.neu
 
 import android.graphics.Paint as AndroidPaint
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -203,12 +205,14 @@ fun NeuButton(
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = tint,
-            modifier = Modifier.size(iconSize),
-        )
+        Crossfade(targetState = icon, animationSpec = tween(180), label = "icon") { ic ->
+            Icon(
+                imageVector = ic,
+                contentDescription = description,
+                tint = tint,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 
@@ -264,6 +268,8 @@ fun NeuSlider(
     var widthPx by remember { mutableFloatStateOf(1f) }
     val change by rememberUpdatedState(onChange)
     val finished by rememberUpdatedState(onFinished)
+    val dragging = remember { mutableStateOf(false) }
+    val thumbScale by animateFloatAsState(if (dragging.value) 1.25f else 1f, label = "thumb")
     val v = value.coerceIn(0f, 1f)
     val thumb = 26.dp
     val thumbPx = with(LocalDensity.current) { thumb.toPx() }
@@ -280,8 +286,9 @@ fun NeuSlider(
             }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
-                    onDragEnd = { finished() },
-                    onDragCancel = { finished() },
+                    onDragStart = { dragging.value = true },
+                    onDragEnd = { dragging.value = false; finished() },
+                    onDragCancel = { dragging.value = false; finished() },
                     onHorizontalDrag = { c, _ ->
                         c.consume()
                         change((c.position.x / widthPx).coerceIn(0f, 1f))
@@ -312,6 +319,10 @@ fun NeuSlider(
                 .align(Alignment.CenterStart)
                 .offset { IntOffset(((widthPx - thumbPx) * v).roundToInt(), 0) }
                 .size(thumb)
+                .graphicsLayer {
+                    scaleX = thumbScale
+                    scaleY = thumbScale
+                }
                 .neuRaised(corner = 13.dp, depth = 3.dp, circle = true),
             contentAlignment = Alignment.Center,
         ) {
